@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: AUTH-SERVICE
+  sql:
+    init:
+      mode: always   # Ensures data.sql runs even when schema exists
+
+  config:
+    import: "configserver:http://localhost:9000"
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/authdb?createDatabaseIfNotExist=true
+    username: root
+    password: Root@1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  cloud:
+    config:
+      fail-fast: true
+      retry:
+        max-attempts: 10
+        initial-interval: 500
+        multiplier: 1.5
+        max-interval: 3000
+
+logging:
+  level:
+    org.springframework.cloud: DEBUG
+    org.springframework.boot.context.config: DEBUG
+
+

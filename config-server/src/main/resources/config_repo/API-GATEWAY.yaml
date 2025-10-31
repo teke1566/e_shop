@@ -1,0 +1,50 @@
+server:
+  port: 9191
+
+spring:
+  application:
+    name: API-GATEWAY
+  cloud:
+    gateway:
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origins: "http://localhost:3000"
+                allowed-methods: "*"
+                allowed-headers: "*"
+                allow-credentials: true
+
+      routes:
+        - id: CATEGORY-SERVICE
+          uri: lb://CATEGORY-SERVICE
+          predicates:
+            - Path=/api/categories/**
+          filters:
+            - name: AuthenticationFilter
+
+        - id: PRODUCT-SERVICE
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - name: AuthenticationFilter
+
+        - id: ORDER-SERVICE
+          uri: lb://ORDER-SERVICE
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - name: AuthenticationFilter
+
+        - id: AUTH-SERVICE
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/api/auth/**
+        - id: PRODUCT-UPLOADS
+          uri: http://localhost:9193  # use direct host, not Eureka
+          predicates:
+            - Path=/uploads/**
+          filters:
+            - RemoveRequestHeader=Authorization

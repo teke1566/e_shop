@@ -1,0 +1,124 @@
+package com.eshop.product.service.Impl;
+
+import com.eshop.product.client.CategoryClient;
+import com.eshop.product.entity.Product;
+import com.eshop.product.exception.ProductServiceException;
+import com.eshop.product.payload.CategoryResponse;
+import com.eshop.product.payload.ProductRequest;
+import com.eshop.product.payload.ProductResponse;
+import com.eshop.product.repository.ProductRepository;
+import com.eshop.product.service.ProductService;
+import org.springframework.beans.BeanUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@Transactional
+public class ProductServiceImpl implements ProductService {
+
+    private final ProductRepository productRepository;
+    private final CategoryClient categoryClient;
+
+    public ProductServiceImpl(ProductRepository productRepository, CategoryClient categoryClient) {
+        this.productRepository = productRepository;
+        this.categoryClient = categoryClient;
+    }
+
+    // -------------------------------------------------------------
+    // 1️ Create / Add Product
+    // -------------------------------------------------------------
+    @Override
+    public ProductResponse addProduct(ProductRequest productRequest) {
+        Product product = new Product();
+        product.setProductName(productRequest.getName());
+        product.setPrice(productRequest.getPrice());
+        product.setQuantity(productRequest.getQuantity());
+        product.setCategoryId(productRequest.getCategoryId());
+
+        // Optional images (from form upload or manual list)
+        if (productRequest.getImageUrls() != null) {
+            product.setImageUrls(productRequest.getImageUrls());
+        }
+
+        productRepository.save(product);
+        return mapToResponse(product);
+    }
+
+    // -------------------------------------------------------------
+    // 2Get All Products
+    // -------------------------------------------------------------
+    @Override
+    public List<ProductResponse> getAllProducts() {
+        return productRepository.findAll()
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    // -------------------------------------------------------------
+    // 3️Get Product by ID
+    // -------------------------------------------------------------
+    @Override
+    public ProductResponse getProductById(Long productId) {
+        Product product = productRepository
+                .findById(productId)
+                .orElseThrow(() -> new ProductServiceException("Product not found", "NOT_FOUND"));
+
+        return mapToResponse(product);
+    }
+
+    // -------------------------------------------------------------
+    // 4️ Get Products by Category ID
+    // -------------------------------------------------------------
+    @Override
+    public List<ProductResponse> getProductsByCategory(Long categoryId) {
+        List<Product> products = productRepository.findByCategoryId(categoryId);
+        return products.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    // -------------------------------------------------------------
+    // 5️ Reduce Quantity
+    // -------------------------------------------------------------
+    @Override
+    public void reduceQuantity(Long productId, Long quantity) {
+        Product product = productRepository
+                .findById(productId)
+                .orElseThrow(() ->
+                        new ProductServiceException("Product not found with id: " + productId, "PRODUCT_NOT_FOUND"));
+
+        if (product.getQuantity() < quantity) {
+            throw new ProductServiceException("Insufficient quantity for product id: " + productId, "INSUFFICIENT_QUANTITY");
+        }
+
+        product.setQuantity(product.getQuantity() - quantity);
+        productRepository.save(product);
+    }
+
+    // -------------------------------------------------------------
+    // Utility: map Entity → Response DTO
+    // -------------------------------------------------------------
+    private ProductResponse mapToResponse(Product product) {
+        ProductResponse response = new ProductResponse();
+        BeanUtils.copyProperties(product, response);
+
+        try {
+            // Use Feign client to fetch category info
+            if (product.getCategoryId() != null) {
+                CategoryResponse category = categoryClient.getCategoryById(product.getCategoryId());
+                response.setCategoryName(category.getName());
+                response.setCategoryImageUrl(category.getImageUrl());
+            }
+        } catch (Exception e) {
+
+            response.setCategoryName("Unknown");
+            response.setCategoryImageUrl(null);
+        }
+
+        return response;
+    }
+}
