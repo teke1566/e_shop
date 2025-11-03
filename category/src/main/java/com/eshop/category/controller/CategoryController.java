@@ -11,7 +11,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/categories")
@@ -34,9 +36,18 @@ public class CategoryController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<CategoryResponse>> list(Pageable pageable) {
-        return ResponseEntity.ok(categoryService.listCategories(pageable));
+    public ResponseEntity<Map<String, Object>> list(Pageable pageable) {
+        Page<CategoryResponse> page = categoryService.listCategories(pageable);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("categories", page.getContent());
+        response.put("currentPage", page.getNumber());
+        response.put("totalItems", page.getTotalElements());
+        response.put("totalPages", page.getTotalPages());
+
+        return ResponseEntity.ok(response);
     }
+
 
     @PutMapping("/{id}")
     public ResponseEntity<CategoryResponse> update(@PathVariable Long id,

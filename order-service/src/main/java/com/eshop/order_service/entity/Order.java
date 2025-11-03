@@ -22,8 +22,10 @@ public class Order {
     private Long orderId;
     private Long productId;
     private Long quantity;
+    @CreationTimestamp
     private Instant orderDate;
     private String orderStatus;
+    @Column(nullable = false)
     private Long amount;
 
     public Long getOrderId() {

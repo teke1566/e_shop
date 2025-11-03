@@ -13,7 +13,9 @@ public class ProductRequest {
     private Long quantity;
     private Long categoryId;
     private List<String> imageUrls;
-
+    private String description;
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
     public void setCategoryId(Long categoryId) {
         this.categoryId = categoryId;
     }

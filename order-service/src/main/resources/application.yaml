@@ -1,26 +1,44 @@
+
 spring:
+  jackson:
+    deserialization:
+      FAIL_ON_UNKNOWN_PROPERTIES: false
   application:
     name: ORDER-SERVICE
+
   config:
     import: "configserver:http://localhost:9000"
+
   datasource:
     url: jdbc:mysql://localhost:3306/orderdb?createDatabaseIfNotExist=true
     username: root
     password: Root@1234
     driver-class-name: com.mysql.cj.jdbc.Driver
+
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
-cloud:
-  config:
-    fail-fast: true
-    retry:
-      max-attempts: 10
-      initial-interval: 500
-      multiplier: 1.5
-      max-interval: 3000
+
+  cloud:
+    config:
+      fail-fast: true
+      retry:
+        max-attempts: 10
+        initial-interval: 500
+        multiplier: 1.5
+        max-interval: 3000
+
 logging:
   level:
-    org.springframework.cloud: DEBUG
-    org.springframework.boot.context.config: DEBUG
+    org.hibernate.SQL: debug
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env,mappings
+  endpoint:
+    health:
+      show-details: never
+

@@ -24,17 +24,23 @@ public class JwtTokenProvider {
     private Long jwtExpirationInMs = 604800L;
 
     // generate token
-    public String generateToken(Authentication authentication){
-        String username = authentication.getName();
+    public String generateToken(Authentication authentication) {
+        org.springframework.security.core.userdetails.User userDetails =
+                (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
+
+        String username = userDetails.getUsername();
+        String role = userDetails.getAuthorities().iterator().next().getAuthority();
+
         Date currentDate = new Date();
         Date expiryDate = new Date(currentDate.getTime() + jwtExpirationInMs);
-        String token = Jwts.builder()
+
+        return Jwts.builder()
                 .subject(username)
+                .claim("role", role) // include role
                 .issuedAt(currentDate)
                 .expiration(expiryDate)
                 .signWith(key())
                 .compact();
-        return token;
     }
 
     // encode the key

@@ -6,35 +6,67 @@ spring:
     name: API-GATEWAY
   cloud:
     gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
       server:
         webflux:
           globalcors:
+            add-to-simple-url-handler-mapping: true
             cors-configurations:
-              '[/**]':
-                allowed-origins: "http://localhost:3000"
-                allowed-methods: "*"
-                allowed-headers: "*"
+              "[/**]":
+                allowed-origins:
+                  - http://localhost:3000
+                allowed-methods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
+                allowed-headers:
+                  - "*"
                 allow-credentials: true
-
       routes:
-        - id: CATEGORY-SERVICE
-          uri: lb://CATEGORY-SERVICE
-          predicates:
-            - Path=/api/categories/**
-          filters:
-            - name: AuthenticationFilter
-
-        - id: PRODUCT-SERVICE
-          uri: lb://PRODUCT-SERVICE
-          predicates:
-            - Path=/api/products/**
-          filters:
-            - name: AuthenticationFilter
-
-        - id: ORDER-SERVICE
+        - id: ORDER-SERVICE-READ
           uri: lb://ORDER-SERVICE
           predicates:
             - Path=/api/orders/**
+            - Method=GET
+
+        - id: ORDER-SERVICE-WRITE
+          uri: lb://ORDER-SERVICE
+          predicates:
+            - Path=/api/orders/**
+            - Method=POST,PUT,DELETE
+          filters:
+            - name: AuthenticationFilter
+
+        - id: PRODUCT-SERVICE-READ
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/api/products/**
+            - Method=GET
+
+        - id: PRODUCT-SERVICE-WRITE
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/api/products/**
+            - Method=POST,PUT,DELETE
+          filters:
+            - name: AuthenticationFilter
+
+        - id: CATEGORY-SERVICE-READ
+          uri: lb://CATEGORY-SERVICE
+          predicates:
+            - Path=/api/categories/**
+            - Method=GET
+
+        - id: CATEGORY-SERVICE-WRITE
+          uri: lb://CATEGORY-SERVICE
+          predicates:
+            - Path=/api/categories/**
+            - Method=POST,PUT,DELETE
           filters:
             - name: AuthenticationFilter
 
@@ -42,9 +74,23 @@ spring:
           uri: lb://AUTH-SERVICE
           predicates:
             - Path=/api/auth/**
+          filters:
+            - RemoveRequestHeader=Cookie
+
         - id: PRODUCT-UPLOADS
-          uri: http://localhost:9193  # use direct host, not Eureka
+          uri: http://localhost:9002
           predicates:
             - Path=/uploads/**
           filters:
             - RemoveRequestHeader=Authorization
+
+management:
+  endpoint:
+    gateway:
+      access: read-only
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env,gateway
+
+

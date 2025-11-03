@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,7 +29,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // -------------------------------------------------------------
-    // 1️ Create / Add Product
+    // 1) Create / Add Product
     // -------------------------------------------------------------
     @Override
     public ProductResponse addProduct(ProductRequest productRequest) {
@@ -38,9 +39,18 @@ public class ProductServiceImpl implements ProductService {
         product.setQuantity(productRequest.getQuantity());
         product.setCategoryId(productRequest.getCategoryId());
 
-        // Optional images (from form upload or manual list)
+        // NEW: description
+        product.setDescription(productRequest.getDescription());
+
+        // Optional images (from form upload or manual list) — sanitize a bit
         if (productRequest.getImageUrls() != null) {
-            product.setImageUrls(productRequest.getImageUrls());
+            List<String> cleaned = productRequest.getImageUrls().stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .distinct()
+                    .collect(Collectors.toList());
+            product.setImageUrls(cleaned);
         }
 
         productRepository.save(product);
@@ -48,7 +58,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // -------------------------------------------------------------
-    // 2Get All Products
+    // 2) Get All Products
     // -------------------------------------------------------------
     @Override
     public List<ProductResponse> getAllProducts() {
@@ -59,19 +69,18 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // -------------------------------------------------------------
-    // 3️Get Product by ID
+    // 3) Get Product by ID
     // -------------------------------------------------------------
     @Override
     public ProductResponse getProductById(Long productId) {
         Product product = productRepository
                 .findById(productId)
                 .orElseThrow(() -> new ProductServiceException("Product not found", "NOT_FOUND"));
-
         return mapToResponse(product);
     }
 
     // -------------------------------------------------------------
-    // 4️ Get Products by Category ID
+    // 4) Get Products by Category ID
     // -------------------------------------------------------------
     @Override
     public List<ProductResponse> getProductsByCategory(Long categoryId) {
@@ -82,7 +91,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     // -------------------------------------------------------------
-    // 5️ Reduce Quantity
+    // 5) Reduce Quantity
     // -------------------------------------------------------------
     @Override
     public void reduceQuantity(Long productId, Long quantity) {
@@ -104,17 +113,19 @@ public class ProductServiceImpl implements ProductService {
     // -------------------------------------------------------------
     private ProductResponse mapToResponse(Product product) {
         ProductResponse response = new ProductResponse();
-        BeanUtils.copyProperties(product, response);
+        BeanUtils.copyProperties(product, response); // copies productName, price, quantity, imageUrls, description, etc.
+
+        // If your ProductResponse uses different field names than Product,
+        // you can set them explicitly here as well. Example:
+        // response.setDescription(product.getDescription());
 
         try {
-            // Use Feign client to fetch category info
             if (product.getCategoryId() != null) {
                 CategoryResponse category = categoryClient.getCategoryById(product.getCategoryId());
                 response.setCategoryName(category.getName());
                 response.setCategoryImageUrl(category.getImageUrl());
             }
         } catch (Exception e) {
-
             response.setCategoryName("Unknown");
             response.setCategoryImageUrl(null);
         }

@@ -10,7 +10,7 @@
         <module name="config-server" />
         <module name="service-registry" />
       </profile>
-      <profile name="Annotation profile for product" enabled="true">
+      <profile name="Annotation profile for api-gateway" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -21,8 +21,8 @@
         <module name="auth-service" />
         <module name="payment-service" />
         <module name="api-gateway" />
-        <module name="user-service" />
         <module name="order-service" />
+        <module name="user-service" />
         <module name="category" />
       </profile>
     </annotationProcessing>

@@ -17,6 +17,15 @@ public class ProductResponse {
     private String categoryImageUrl;
 
     private List<String> imageUrls;
+    private String description;
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
 
     public String getCategoryImageUrl() {
         return categoryImageUrl;

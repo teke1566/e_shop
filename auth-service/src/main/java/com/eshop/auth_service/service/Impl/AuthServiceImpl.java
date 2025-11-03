@@ -3,6 +3,7 @@ package com.eshop.auth_service.service.Impl;
 
 import com.eshop.auth_service.entity.Role;
 import com.eshop.auth_service.entity.User;
+import com.eshop.auth_service.payload.AuthResponse;
 import com.eshop.auth_service.payload.LoginDto;
 import com.eshop.auth_service.payload.RegisterDto;
 import com.eshop.auth_service.repository.RoleRepository;
@@ -33,46 +34,62 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
-    @Override
-    public String login(LoginDto loginDto) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginDto.getUsernameOrEmail(),
-                        loginDto.getPassword()
-                ));
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String token = jwtTokenProvider.generateToken(authentication);
-        return token;
-    }
 
     @Override
     public String register(RegisterDto registerDto) {
-        // add check for username exist in database
-        if(userRepository.existsByUsername(registerDto.getUsername())){
-            throw new RuntimeException("Username is already taken!" );
+        if (userRepository.existsByUsername(registerDto.getUsername())) {
+            throw new RuntimeException("Username is already taken!");
+        }
+        if (userRepository.existsByEmail(registerDto.getEmail())) {
+            throw new RuntimeException("Email is already taken!");
         }
 
-        // add check for email exist in database
-        if(userRepository.existsByEmail(registerDto.getEmail())){
-            throw new RuntimeException("Email is already taken!" );
-        }
-
-        // new user object
         User user = new User();
         user.setName(registerDto.getName());
         user.setUsername(registerDto.getUsername());
         user.setEmail(registerDto.getEmail());
         user.setPassword(passwordEncoder.encode(registerDto.getPassword()));
 
-        // assign a role to the user
+        // Check if admin role is requested (optional)
         Set<Role> roles = new HashSet<>();
-        Role userRole = roleRepository.findByName("ROLE_USER")
-                .orElseThrow(() -> new RuntimeException("User Role not set."));
-        roles.add(userRole);
+        String requestedRole = registerDto.getRole(); // we’ll add this field below
+        Role role = null;
+        if (requestedRole != null && requestedRole.equalsIgnoreCase("ROLE_ADMIN")) {
+            role = roleRepository.findByName("ROLE_ADMIN")
+                    .orElseThrow(() -> new RuntimeException("Admin role not set."));
+        } else {
+            role = roleRepository.findByName("ROLE_USER")
+                    .orElseThrow(() -> new RuntimeException("User role not set."));
+        }
+        roles.add(role);
         user.setRoles(roles);
-
-        // save the user into database
         userRepository.save(user);
-        return "User registered successfully";
+
+        return "User registered successfully with role: " + role.getName();
     }
+
+    @Override
+    public AuthResponse login(LoginDto loginDto) {
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginDto.getUsernameOrEmail(),
+                        loginDto.getPassword()
+                ));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String token = jwtTokenProvider.generateToken(authentication);
+
+        // Extract role from authenticated user
+        org.springframework.security.core.userdetails.User userDetails =
+                (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
+
+        String role = userDetails.getAuthorities().stream()
+                .findFirst()
+                .map(Object::toString)
+                .orElse("ROLE_USER");
+
+        return new AuthResponse(token, role);
+    }
+
+
 }

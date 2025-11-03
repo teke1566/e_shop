@@ -24,11 +24,17 @@ public class Product {
     private Long quantity;
     private Long categoryId;
     private String categoryName;
+    @Column(columnDefinition = "TEXT")
+
+    private String description;
+
 
     @ElementCollection
     @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "image_url")
     private List<String> imageUrls = new ArrayList<>();
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
     public Long getCategoryId() {
         return categoryId;

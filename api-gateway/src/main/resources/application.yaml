@@ -17,7 +17,10 @@ eureka:
     prefer-ip-address: true
 
 management:
+  endpoint:
+    gateway:
+      enabled: true
   endpoints:
     web:
       exposure:
-        include: "health,info,env,gateway"
+        include: health,info,metrics,loggers,env,beans,httpexchanges,gateway

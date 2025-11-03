@@ -19,7 +19,9 @@ public class JwtUtil {
     }
 
     private Key getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
-        return Keys.hmacShaKeyFor(keyBytes);
+        // standard Base64 (NOT Base64URL)
+        byte[] keyBytes = io.jsonwebtoken.io.Decoders.BASE64.decode(jwtSecret);
+        return io.jsonwebtoken.security.Keys.hmacShaKeyFor(keyBytes);
     }
+
 }

@@ -1,45 +1,48 @@
 package com.eshop.order_service.payload;
 
-import lombok.*;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class OrderRequest {
-    private Long productId;
-    private Long quantity;
-    private Long amount;
+
+    // Accept numeric or strings like "Free", "$5.99"
+    @JsonDeserialize(using = com.eshop.order_service.jackson.MoneyDeserializer.class)
+    private BigDecimal shipping;
+
+    @JsonAlias({"cartItems", "cart"})
+    private List<Item> items;
+
     private PaymentMethod paymentMethod;
 
-    public Long getProductId() {
-        return productId;
-    }
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Item {
+        @JsonAlias({ "id", "product_id" })
+        private Long productId;
 
-    public void setProductId(Long productId) {
-        this.productId = productId;
-    }
+        @JsonAlias({ "name", "title", "productName" })
+        private String productName;
 
-    public Long getQuantity() {
-        return quantity;
-    }
+        @JsonAlias({ "image", "image_url", "imageUrl" })
+        private String imageUrl;
 
-    public void setQuantity(Long quantity) {
-        this.quantity = quantity;
-    }
+        @JsonAlias({ "price", "unit_price" })
+        private java.math.BigDecimal unitPrice;
 
-    public Long getAmount() {
-        return amount;
-    }
-
-    public void setAmount(Long amount) {
-        this.amount = amount;
-    }
-
-    public PaymentMethod getPaymentMethod() {
-        return paymentMethod;
-    }
-
-    public void setPaymentMethod(PaymentMethod paymentMethod) {
-        this.paymentMethod = paymentMethod;
+        @JsonAlias({ "qty", "count" })
+        private Long quantity;
     }
 }

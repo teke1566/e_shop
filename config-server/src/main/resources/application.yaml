@@ -20,3 +20,13 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     hostname: localhost
+
+# application.yml (API-GATEWAY)
+management:
+  endpoint:
+    gateway:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers,env,beans,httpexchanges,gateway

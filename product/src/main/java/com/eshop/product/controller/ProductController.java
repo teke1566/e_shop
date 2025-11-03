@@ -2,6 +2,7 @@ package com.eshop.product.controller;
 
 import com.eshop.product.payload.ProductRequest;
 import com.eshop.product.payload.ProductResponse;
+import com.eshop.product.payload.ReduceQuantityRequest;
 import com.eshop.product.service.ProductService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,12 +38,15 @@ public class ProductController {
         ProductResponse productResponse = productService.getProductById(productId);
         return new ResponseEntity<>(productResponse, HttpStatus.OK);
     }
-    @PutMapping("/reduce-quantity/{id}")
-    public ResponseEntity<Void> reduceQuantity(@PathVariable("id") Long productId,
-                                               @RequestParam("quantity") Long quantity){
-        productService.reduceQuantity(productId,quantity);
+    @PutMapping("/reduce-quantity")
+    public ResponseEntity<Void> reduceQuantity(@RequestBody ReduceQuantityRequest request) {
+        productService.reduceQuantity(request.getProductId(), request.getQuantity());
         return ResponseEntity.noContent().build();
     }
+
+
+
+
     @GetMapping("/by-category/{categoryId}")
     public ResponseEntity<List<ProductResponse>> getByCategory(@PathVariable Long categoryId) {
         return ResponseEntity.ok(productService.getProductsByCategory(categoryId));
