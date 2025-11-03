@@ -19,32 +19,44 @@ const SearchPage = () => {
   const category = params.get("cat") || "All";
 
   useEffect(() => {
-    if (query.trim() || category.trim() !== "All") {
+    if (query.trim() || category.trim().toLowerCase() !== "all") {
       dispatch(searchProducts(query, category));
     }
   }, [dispatch, query, category]);
 
+  // ---- categories from normalized results ----
   const availableCategories = useMemo(() => {
     const unique = new Set();
-    results.forEach(
-      (item) => item.category?.name && unique.add(item.category.name)
-    );
+    (results || []).forEach((item) => {
+      const name = item.categoryName || item.category?.name;
+      if (name) unique.add(name);
+    });
     return Array.from(unique);
   }, [results]);
 
+  // ---- client-side filter by the flat categoryName ----
   const filtered = activeCategory
-    ? results.filter((r) => r.category?.name === activeCategory)
-    : results;
+    ? (results || []).filter(
+        (r) =>
+          (r.categoryName || r.category?.name || "").toLowerCase() ===
+          activeCategory.toLowerCase()
+      )
+    : results || [];
 
+  // ---- sort helpers (robust to missing fields) ----
   const sortedResults = useMemo(() => {
     const sorted = [...filtered];
     switch (sortBy) {
       case "Price: Low to High":
-        return sorted.sort((a, b) => a.price - b.price);
+        return sorted.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
       case "Price: High to Low":
-        return sorted.sort((a, b) => b.price - a.price);
+        return sorted.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
       case "Newest Arrivals":
-        return sorted.sort((a, b) => new Date(b.creationAt) - new Date(a.creationAt));
+        return sorted.sort(
+          (a, b) =>
+            new Date(b.creationAt || b.createdAt || 0) -
+            new Date(a.creationAt || a.createdAt || 0)
+        );
       default:
         return sorted;
     }

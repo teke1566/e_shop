@@ -1,41 +1,83 @@
 import React from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css";
 
+const api = axios.create({ baseURL: "http://localhost:9191" });
+
 const RegisterPage = () => {
-  const initialValues = {
-    firstName: "",
-    email: "",
-    mobile: "",
-    password: "",
-  };
-
-  const validationSchema = Yup.object({
-    firstName: Yup.string().required("First name is required"),
-    email: Yup.string()
-      .required("Email is required")
-      .email("Invalid email format"),
-    mobile: Yup.string()
-      .required("Mobile is required")
-      .length(10, "Mobile number must be 10 digits"),
-    password: Yup.string()
-      .required("Password is required")
-      .min(6, "Password must be at least 6 characters"),
-  });
-
-  const onSubmit = (values) => {
-    console.log("Form Data:", values);
-    alert(`🎉 Welcome ${values.firstName}!`);
-  };
+  const navigate = useNavigate();
+  const [serverError, setServerError] = React.useState("");
 
   const formik = useFormik({
-    initialValues,
-    onSubmit,
-    validationSchema,
-    validateOnMount: true,
+    initialValues: {
+      name: "",
+      username: "",
+      email: "",
+      mobile: "",
+      password: "",
+    },
+    validationSchema: Yup.object({
+      name: Yup.string().required("Name is required"),
+      username: Yup.string()
+        .min(3, "Min 3 characters")
+        .matches(/^[a-zA-Z0-9._-]+$/, "Letters, numbers, . _ - only")
+        .required("Username is required"),
+      email: Yup.string().email("Invalid email").required("Email is required"),
+      mobile: Yup.string().length(10, "Must be 10 digits").nullable(),
+      password: Yup.string().min(6, "Min 6 characters").required("Password is required"),
+    }),
+    onSubmit: async (values, { setSubmitting }) => {
+      setServerError("");
+      try {
+        const payload = {
+          name: values.name.trim(),
+          username: values.username.trim(),
+          email: values.email.trim(),
+          password: values.password,
+        };
+
+        const res = await api.post("/api/auth/register", payload, {
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (res.status === 200 || res.status === 201) {
+          alert("🎉 Registration successful! Please sign in.");
+          navigate("/login");
+        }
+      } catch (err) {
+        const msg =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message ||
+          "Registration failed";
+        setServerError(msg);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    validateOnMount: false,
   });
+
+  const handleTrySubmit = async (e) => {
+    e.preventDefault();
+    setServerError("");
+
+    const allTouched = Object.keys(formik.values).reduce(
+      (acc, k) => ({ ...acc, [k]: true }),
+      {}
+    );
+    formik.setTouched(allTouched, true);
+
+    const errors = await formik.validateForm();
+    if (Object.keys(errors).length) return; 
+    formik.handleSubmit(); 
+  };
+
+  const cls = (n) =>
+    `form-control ${formik.touched[n] && formik.errors[n] ? "is-invalid" : ""}`;
 
   return (
     <div className="container d-flex justify-content-center align-items-center vh-100">
@@ -44,127 +86,107 @@ const RegisterPage = () => {
           <h2 className="text-center text-primary mb-3">Register</h2>
           <hr />
 
-          <form onSubmit={formik.handleSubmit} noValidate>
-            {/* First Name */}
+          {serverError && <div className="alert alert-danger py-2">{serverError}</div>}
+
+          <form onSubmit={handleTrySubmit} noValidate>
             <div className="mb-3">
-              <label htmlFor="firstName" className="form-label">
-                First Name
-              </label>
+              <label className="form-label" htmlFor="name">Name</label>
               <input
-                id="firstName"
-                name="firstName"
+                id="name"
+                name="name"
                 type="text"
-                className={`form-control ${
-                  formik.errors.firstName && formik.touched.firstName
-                    ? "is-invalid"
-                    : ""
-                }`}
-                value={formik.values.firstName}
+                className={cls("name")}
+                value={formik.values.name}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                placeholder="John"
+                placeholder="John Doe"
+                autoComplete="name"
               />
-              {formik.errors.firstName && formik.touched.firstName && (
-                <div className="text-danger small mt-1">
-                  {formik.errors.firstName}
-                </div>
+              {formik.touched.name && formik.errors.name && (
+                <div className="text-danger small mt-1">{formik.errors.name}</div>
               )}
             </div>
 
-            {/* Email */}
             <div className="mb-3">
-              <label htmlFor="email" className="form-label">
-                Email
-              </label>
+              <label className="form-label" htmlFor="username">Username</label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                className={cls("username")}
+                value={formik.values.username}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                placeholder="teke5"
+                autoComplete="username"
+              />
+              {formik.touched.username && formik.errors.username && (
+                <div className="text-danger small mt-1">{formik.errors.username}</div>
+              )}
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label" htmlFor="email">Email</label>
               <input
                 id="email"
                 name="email"
-                type="text"
-                className={`form-control ${
-                  formik.errors.email && formik.touched.email
-                    ? "is-invalid"
-                    : ""
-                }`}
+                type="email"
+                className={cls("email")}
                 value={formik.values.email}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
                 placeholder="you@example.com"
+                autoComplete="email"
               />
-              {formik.errors.email && formik.touched.email && (
-                <div className="text-danger small mt-1">
-                  {formik.errors.email}
-                </div>
+              {formik.touched.email && formik.errors.email && (
+                <div className="text-danger small mt-1">{formik.errors.email}</div>
               )}
             </div>
 
-            {/* Mobile */}
             <div className="mb-3">
-              <label htmlFor="mobile" className="form-label">
-                Mobile
-              </label>
+              <label className="form-label" htmlFor="mobile">Mobile (optional)</label>
               <input
                 id="mobile"
                 name="mobile"
                 type="text"
-                className={`form-control ${
-                  formik.errors.mobile && formik.touched.mobile
-                    ? "is-invalid"
-                    : ""
-                }`}
+                className={cls("mobile")}
                 value={formik.values.mobile}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
-                placeholder="1234567890"
+                placeholder="0912345678"
+                autoComplete="tel"
               />
-              {formik.errors.mobile && formik.touched.mobile && (
-                <div className="text-danger small mt-1">
-                  {formik.errors.mobile}
-                </div>
+              {formik.touched.mobile && formik.errors.mobile && (
+                <div className="text-danger small mt-1">{formik.errors.mobile}</div>
               )}
             </div>
 
-            {/* Password */}
             <div className="mb-3">
-              <label htmlFor="password" className="form-label">
-                Password
-              </label>
+              <label className="form-label" htmlFor="password">Password</label>
               <input
                 id="password"
                 name="password"
                 type="password"
-                className={`form-control ${
-                  formik.errors.password && formik.touched.password
-                    ? "is-invalid"
-                    : ""
-                }`}
+                className={cls("password")}
                 value={formik.values.password}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
                 placeholder="••••••••"
+                autoComplete="new-password"
               />
-              {formik.errors.password && formik.touched.password && (
-                <div className="text-danger small mt-1">
-                  {formik.errors.password}
-                </div>
+              {formik.touched.password && formik.errors.password && (
+                <div className="text-danger small mt-1">{formik.errors.password}</div>
               )}
             </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              className="btn btn-primary w-100"
-              disabled={!formik.isValid}
-            >
-              Register
+            {/* Always enabled; errors will show and prevent API call */}
+            <button type="submit" className="btn btn-primary w-100">
+              {formik.isSubmitting ? "Registering..." : "Register"}
             </button>
           </form>
 
-          {/* Footer */}
           <p className="text-center mt-3 mb-0">
-            Already have an account?{" "}
-            <Link to="/login" className="text-decoration-none">
-              Login here
-            </Link>
+            Already have an account? <Link to="/login">Login here</Link>
           </p>
         </div>
       </div>

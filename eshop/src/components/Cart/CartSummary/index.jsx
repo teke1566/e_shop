@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { getTotalCartAmount, emptyCart } from "../../../redux/actions/cart-actions";
 import api from "../../../services/api";
 import { useNavigate } from "react-router-dom";
+import { showToast } from "../../../utils/ToastService";
 
 const CartSummary = () => {
   const dispatch = useDispatch();
@@ -16,41 +17,65 @@ const CartSummary = () => {
   }, [carts, dispatch]);
 
   const subtotal = Number(cartTotalAmount) || 0;
-  const shipping = carts.length > 0 ? 10 : 0;
+  const shipping = 0;
   const grandTotal = subtotal + shipping;
 
-  // Checkout Handler
   const handleCheckout = async () => {
+    if (carts.length === 0) {
+      showToast("Your cart is empty!", "warning");
+      return;
+    }
+
+    const orderItems = carts.map((p) => ({
+      productId: Number(p.id ?? p.productId),                 
+      productName: p.title ?? p.productName ?? p.name ?? "",
+      imageUrl:
+        (Array.isArray(p.imageUrls) && p.imageUrls[0]) ||
+        (Array.isArray(p.images) && p.images[0]) ||
+        p.imageUrl ||
+        null,
+      unitPrice: Number(p.price),                              
+      quantity: Number(p.quantity ?? 1),
+    }));
+
+    const bad = orderItems.find(
+      (i) =>
+        !Number.isFinite(i.productId) ||
+        !Number.isFinite(i.unitPrice) ||
+        !Number.isFinite(i.quantity) ||
+        i.quantity <= 0
+    );
+    if (bad) {
+      showToast("One or more items are invalid. Refresh and try again.", "danger");
+      return;
+    }
+
+    const payload = {
+      shipping,                         
+      paymentMethod: "CREDIT_CARD",
+      items: orderItems,
+    };
+
     try {
-      if (carts.length === 0) {
-        alert("Your cart is empty!");
+      const res = await api.post("/api/orders/placed", payload);
+
+      
+      const orderId = Number(res?.data?.orderId ?? res?.data);
+      if (!Number.isFinite(orderId)) {
+        showToast("Unexpected response from server.", "warning");
         return;
       }
 
-      // For simplicity: pick the first item (you can loop through multiple)
-      const firstItem = carts[0];
-
-      const orderPayload = {
-        productId: firstItem.id || firstItem.productId,
-        quantity: firstItem.quantity,
-        amount: firstItem.price * firstItem.quantity,
-        paymentMethod: "CREDIT_CARD",
-      };
-
-      console.log("Sending order request:", orderPayload);
-
-      const response = await api.post("/api/orders/placed", orderPayload);
-
-      if (response.status === 201) {
-        alert(`Order placed successfully! Order ID: ${response.data}`);
-        dispatch(emptyCart());
-        navigate(`/order-confirmation/${response.data}`);
-      } else {
-        alert("❌ Something went wrong. Try again.");
-      }
+      showToast("Order placed successfully!", "success");
+      dispatch(emptyCart());
+      navigate(`/order-confirmation/${orderId}`, { state: { orderId } });
     } catch (error) {
+      const msg =
+        error?.response?.data?.errorMessage ||
+        error?.message ||
+        "Failed to place order.";
       console.error("Checkout failed:", error);
-      alert("⚠️ Failed to place order. Check backend logs for details.");
+      showToast(`⚠️ ${msg}`, "danger");
     }
   };
 

@@ -5,23 +5,43 @@ import "./index.css";
 const ProductCard = ({ product, onAddToCart }) => {
   const navigate = useNavigate();
 
-  // ✅ Use real backend field names
   const {
     productId,
     productName,
     price,
     imageUrls = [],
-    categoryId,
     categoryName,
   } = product;
 
-  // ✅ Handle image URLs safely
-  const imageSrc =
-    Array.isArray(imageUrls) && imageUrls.length > 0
-      ? imageUrls[0].startsWith("http")
-        ? imageUrls[0]
-        : `http://localhost:9191/${imageUrls[0].replace(/^\/+/, "")}`
-      : "/assets/no-image.png"; // fallback image from public/assets
+  const SVG_FALLBACK =
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 600'>
+         <defs>
+           <linearGradient id='g' x1='0' x2='1' y1='0' y2='1'>
+             <stop offset='0%' stop-color='#f3f4f6'/>
+             <stop offset='100%' stop-color='#e5e7eb'/>
+           </linearGradient>
+         </defs>
+         <rect width='100%' height='100%' fill='url(#g)'/>
+         <g fill='#9ca3af'>
+           <rect x='140' y='170' width='320' height='200' rx='8' ry='8' opacity='0.45'/>
+           <circle cx='220' cy='270' r='34' opacity='0.45'/>
+         </g>
+         <text x='50%' y='78%' dominant-baseline='middle' text-anchor='middle'
+               font-family='sans-serif' font-size='28' fill='#9ca3af'>No Image</text>
+       </svg>`
+    );
+
+  const toAbsolute = (url) => {
+    if (!url) return null;
+    return /^https?:\/\//i.test(url)
+      ? url
+      : `http://localhost:9191/${String(url).replace(/^\/+/, "")}`;
+  };
+
+  const firstUrl = Array.isArray(imageUrls) && imageUrls.length > 0 ? imageUrls[0] : null;
+  const imageSrc = toAbsolute(firstUrl) || SVG_FALLBACK;
 
   const isBestSeller = Math.random() > 0.8;
 
@@ -42,16 +62,19 @@ const ProductCard = ({ product, onAddToCart }) => {
         >
           <img
             src={imageSrc}
-            alt={productName}
+            alt={productName || "Product"}
+            loading="lazy"
             className="card-img-top"
             style={{
-              height: "230px",
+              aspectRatio: "1 / 1",
+              minHeight: 230,
               objectFit: "contain",
               backgroundColor: "#f9f9f9",
               borderBottom: "1px solid #eee",
             }}
             onError={(e) => {
-              e.target.src = "/assets/no-image.png"; // fallback if broken
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = SVG_FALLBACK;
             }}
           />
         </Link>
@@ -60,7 +83,6 @@ const ProductCard = ({ product, onAddToCart }) => {
           <small className="text-muted d-block mb-1">Sponsored</small>
           <h6 className="fw-semibold text-truncate mb-2">{productName}</h6>
 
-          {/*  Category badge fixed */}
           <span className="badge bg-info text-white mb-2">
             {categoryName || "General"}
           </span>
@@ -75,9 +97,9 @@ const ProductCard = ({ product, onAddToCart }) => {
           </span>
 
           <div className="d-flex align-items-baseline mb-2">
-            <h5 className="text-danger fw-bold mb-0">${price}</h5>
+            <h5 className="text-danger fw-bold mb-0">${Number(price || 0).toFixed(2)}</h5>
             <small className="text-muted ms-2">
-              <s>${(Number(price) + 20).toFixed(2)}</s>
+              <s>${(Number(price || 0) + 20).toFixed(2)}</s>
             </small>
           </div>
 

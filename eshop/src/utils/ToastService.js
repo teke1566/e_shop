@@ -1,4 +1,3 @@
-// src/utils/ToastService.js
 export const showToast = (message, type = "success") => {
   const colors = {
     success: "#00a65a",
@@ -7,7 +6,7 @@ export const showToast = (message, type = "success") => {
     info: "#17a2b8",
   };
 
-  // ✅ Create or find container
+  //  Create or find container
   let container = document.getElementById("amazon-toast-container");
   if (!container) {
     container = document.createElement("div");
@@ -19,13 +18,13 @@ export const showToast = (message, type = "success") => {
     document.body.appendChild(container);
   }
 
-  // ✅ Remove previous toast if any (Amazon-like behavior)
+  //  Remove previous toast if any (Amazon-like behavior)
   const existingToast = container.querySelector(".amazon-toast");
   if (existingToast) {
     existingToast.remove();
   }
 
-  // ✅ Create toast element
+  //  Create toast element
   const toast = document.createElement("div");
   toast.className = "amazon-toast";
   toast.style.minWidth = "240px";
@@ -45,7 +44,7 @@ export const showToast = (message, type = "success") => {
   toast.style.justifyContent = "space-between";
   toast.style.gap = "8px";
 
-  // ✅ Add icon
+  //  Add icon
   const icon = document.createElement("i");
   icon.className =
     type === "success"
@@ -63,12 +62,12 @@ export const showToast = (message, type = "success") => {
   const text = document.createElement("span");
   text.textContent = message;
 
-  // ✅ Build and append
+  //  Build and append
   toast.appendChild(icon);
   toast.appendChild(text);
   container.appendChild(toast);
 
-  // ✅ Animate in
+  // Animate in
   requestAnimationFrame(() => {
     toast.style.opacity = "1";
     toast.style.transform = "translateX(0)";

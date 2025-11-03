@@ -2,62 +2,108 @@ import React, { useState } from "react";
 import axios from "axios";
 import * as Yup from "yup";
 import { Formik, Form, Field, ErrorMessage } from "formik";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
+
+// Axios instance hitting API Gateway
+const api = axios.create({
+  baseURL: "http://localhost:9191",
+});
+
+// Helper: decode JWT payload safely
+const decodeJwt = (token) => {
+  try {
+    const [, payload] = token.split(".");
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+};
+
+// Validation schema
+const emailOrUsernameSchema = Yup.string()
+  .required("Email or username is required")
+  .test("email-or-username", "Enter a valid email or username", (value) => {
+    if (!value) return false;
+    const v = String(value).trim();
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    const isUsername = /^[a-zA-Z0-9._-]{3,}$/.test(v);
+    return isEmail || isUsername;
+  });
+
+const validationSchema = Yup.object({
+  emailOrUsername: emailOrUsernameSchema,
+  password: Yup.string()
+    .required("Password is required")
+    .min(6, "Password must be at least 6 characters"),
+});
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const [responseMsg, setResponseMsg] = useState({
-    message: "",
-    alertClass: "",
-  });
+  const location = useLocation();
+  const [responseMsg, setResponseMsg] = useState({ message: "", type: "" });
 
-  // Initial form values
   const initialValues = {
-    email: "",
+    emailOrUsername: "",
     password: "",
   };
 
-  // Validation schema
-  const validationSchema = Yup.object({
-    email: Yup.string()
-      .required("Email is required")
-      .email("Invalid email format"),
-    password: Yup.string()
-      .required("Password is required")
-      .min(6, "Password must be at least 6 characters"),
-  });
+  const onSubmit = async (values, { setSubmitting }) => {
+    setResponseMsg({ message: "", type: "" });
 
-  // Handle submit
-  const onSubmit = (values, { setSubmitting }) => {
-    axios
-      .post("http://localhost:9191/api/auth/login", {
-        usernameOrEmail: values.email,
+    try {
+      // Call login endpoint via Gateway
+      const res = await api.post("/api/auth/login", {
+        usernameOrEmail: values.emailOrUsername.trim(),
         password: values.password,
-      })
-      .then((response) => {
-        console.log(" Login success:", response.data);
+      });
 
-        // Show success message
-        setResponseMsg({
-          message: "🎉 Login Successful!",
-          alertClass: "alert alert-success text-center",
-        });
+      console.log("Login response:", res.data);
 
-        //  Save token directly — backend returns plain JWT string
-        localStorage.setItem("token", response.data);
+      // Handle both {token, role} object or plain token
+      let token, role;
+      if (typeof res.data === "string") {
+        token = res.data;
+        role = "ROLE_USER";
+      } else {
+        token = res.data?.token;
+        role = res.data?.role || "ROLE_USER";
+      }
 
-        // Optional: small delay before redirect
-        setTimeout(() => navigate("/"), 1000);
-      })
-      .catch((error) => {
-        console.error("❌ Login failed:", error);
-        setResponseMsg({
-          message: "❌ Login Failed! Please try again.",
-          alertClass: "alert alert-danger text-center",
-        });
-      })
-      .finally(() => setSubmitting(false));
+      if (!token) throw new Error("Invalid response: no token received");
+
+      // Store token and role in localStorage
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", role);
+
+      // Decode expiry if available
+      const jwt = decodeJwt(token);
+      if (jwt?.exp) localStorage.setItem("token_exp", String(jwt.exp * 1000));
+
+      // Success message
+      setResponseMsg({ message: "Login successful!", type: "success" });
+
+      const search = new URLSearchParams(location.search);
+      const next = search.get("next");
+      setTimeout(() => {
+        if (role === "ROLE_ADMIN") {
+          navigate("/admin/products", { replace: true });
+        } else {
+          navigate(next || "/", { replace: true });
+        }
+      }, 700);
+    } catch (err) {
+      console.error("Login error:", err.response || err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        (err?.response?.status === 401
+          ? "Invalid credentials"
+          : "Login failed. Please try again.");
+      setResponseMsg({ message: msg, type: "danger" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -67,9 +113,11 @@ const LoginPage = () => {
           <h2 className="text-center text-primary mb-3">Login</h2>
           <hr />
 
-          {/* Message banner */}
           {responseMsg.message && (
-            <div className={responseMsg.alertClass} role="alert">
+            <div
+              className={`alert alert-${responseMsg.type} text-center`}
+              role="alert"
+            >
               {responseMsg.message}
             </div>
           )}
@@ -79,22 +127,22 @@ const LoginPage = () => {
             validationSchema={validationSchema}
             onSubmit={onSubmit}
           >
-            {({ isValid, isSubmitting }) => (
-              <Form>
-                {/* Email */}
+            {({ isSubmitting }) => (
+              <Form noValidate>
+                {/* Email or Username */}
                 <div className="mb-3">
-                  <label htmlFor="email" className="form-label">
-                    Email
+                  <label htmlFor="emailOrUsername" className="form-label">
+                    Email or Username
                   </label>
                   <Field
-                    type="email"
-                    name="email"
-                    id="email"
+                    type="text"
+                    name="emailOrUsername"
+                    id="emailOrUsername"
                     className="form-control"
-                    placeholder="you@example.com"
+                    placeholder="you@example.com or admin"
                   />
                   <ErrorMessage
-                    name="email"
+                    name="emailOrUsername"
                     component="div"
                     className="text-danger small mt-1"
                   />
@@ -119,11 +167,11 @@ const LoginPage = () => {
                   />
                 </div>
 
-                {/* Submit button */}
+                {/* Submit */}
                 <button
                   type="submit"
                   className="btn btn-primary w-100"
-                  disabled={!isValid || isSubmitting}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <>
@@ -142,12 +190,8 @@ const LoginPage = () => {
             )}
           </Formik>
 
-          {/* Register link */}
           <p className="text-center mt-3 mb-0">
-            New user?{" "}
-            <Link to="/register" className="text-decoration-none">
-              Register here
-            </Link>
+            New user? <Link to="/register">Register here</Link>
           </p>
         </div>
       </div>

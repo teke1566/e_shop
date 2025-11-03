@@ -1,22 +1,34 @@
 import React, { useState, useEffect } from "react";
-import api from "../../services/api"; // import the configured axios instance
+import api from "../../services/api";
 import Category from "./Category";
 
 const CategoryList = () => {
   const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const fetchCategories = async () => {
     try {
       const res = await api.get("/api/categories");
-      setCategories(res.data.content || res.data); // support pageable or list
+      const data = res.data;
+
+      const list = Array.isArray(data)
+        ? data
+        : data?.content ?? data?.categories ?? [];
+
+      setCategories(list);
     } catch (error) {
       console.error("Error fetching categories:", error);
+      setCategories([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchCategories();
   }, []);
+
+  if (loading) return <div className="container mt-4">Loading...</div>;
 
   return (
     <div className="container mt-4">

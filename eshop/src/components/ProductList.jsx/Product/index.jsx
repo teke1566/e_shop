@@ -12,7 +12,6 @@ const Product = ({ data }) => {
   const [show, setShow] = useState(false);
   const [size, setSize] = useState("Medium");
 
-  //  Normalize image URL (handle relative or absolute)
   const imageSrc =
     imageUrls?.[0]?.startsWith("http")
       ? imageUrls[0]

@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import HomePage from "./pages/HomePage";
 import ProductPage from "./pages/ProductPage";
@@ -11,30 +11,21 @@ import LoginPage from "./pages/Loginpage";
 import CartPage from "./pages/CartPage";
 import SearchPage from "./pages/SearchPage";
 import OrderConfirmation from "./pages/OrderConfirmation";
+import AdminProducts from "./components/Admin/AdminProducts";
+import AdminRoute from "./components/Admin/AdminRoute";
 
+import { hasRole } from "./utils/auth";
+
+function HomeGate() {
+  return hasRole("ROLE_ADMIN") ? <Navigate to="/admin/products" replace /> : <HomePage />;
+}
 
 function App() {
-
   return (
-    
     <BrowserRouter>
- {/* <marquee
-        behavior="scroll"
-        direction="left"
-        scrollamount="8"
-        style={{
-          backgroundColor: "#222",
-          color: "white",
-          padding: "8px",
-          fontWeight: "bold",
-          fontSize: "1rem",
-        }}
-      >
-        🛍️ Black Friday Deals! Up to 70% Off on Select Products 🎉
-      </marquee> */}
       <Routes>
-        
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<HomeGate />} />
+        <Route path="/home" element={<HomePage />} />
         <Route path="/products" element={<ProductPage />} />
         <Route path="/products/:id" element={<ProductDetailPage />} />
         <Route path="/about" element={<AboutPage />} />
@@ -42,9 +33,17 @@ function App() {
         <Route path="/register" element={<RegisterPage/>}/>
         <Route path="/login" element={<LoginPage/>}/>
         <Route path="/cart" element={<CartPage />} />
-         <Route path="/search" element={<SearchPage />}/>
-         <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
+        <Route path="/search" element={<SearchPage />}/>
+        <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
 
+        <Route
+          path="/admin/products"
+          element={
+            <AdminRoute>
+              <AdminProducts />
+            </AdminRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );

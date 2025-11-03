@@ -2,11 +2,63 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { ToastContainer } from "react-toastify";
-import { searchProducts, clearSearchResults } from "../../redux/actions/search-actions";
+import {
+  searchProducts,
+  clearSearchResults,
+} from "../../redux/actions/search-actions";
+import {
+  isAuthenticated,
+  getToken,
+  getRole,
+  hasRole,
+  logout,
+} from "../../utils/auth"; // ✅ use consistent utils
 import "./index.css";
+
+const isAll = (s = "") => /^all(\s*departments)?$/i.test(s.trim());
+
+const decodeJwt = (tkn) => {
+  try {
+    const [, payload] = String(tkn || "").split(".");
+    if (!payload) return null;
+    const b64 = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(payload.length / 4) * 4, "=");
+    return JSON.parse(atob(b64));
+  } catch {
+    return null;
+  }
+};
+
+const firstValid = (...vals) => {
+  for (const v of vals) {
+    if (v == null) continue;
+    if (Array.isArray(v)) continue;
+    const s = String(v).trim();
+    if (!s) continue;
+    return s;
+  }
+  return null;
+};
+
+const readDisplayName = () => {
+  const p = decodeJwt(getToken()) || {};
+  return firstValid(
+    p.username,
+    p.preferred_username,
+    p.name,
+    p.sub && (p.sub.includes("@") ? p.sub.split("@")[0] : p.sub),
+    p.upn && p.upn.split("@")[0],
+    p.email && p.email.split("@")[0]
+  );
+};
+
+/* ================================================= */
 
 const Navbar = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [displayName, setDisplayName] = useState(null);
   const [category, setCategory] = useState("All Departments");
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
@@ -15,7 +67,8 @@ const Navbar = () => {
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const cartItemCount = useSelector((state) => state.cart?.cartTotalQuantity || 0);
+  const cartItemCount =
+    useSelector((state) => state.cart?.cartTotalQuantity) || 0;
   const { results, loading } = useSelector((state) => state.search);
 
   const categories = [
@@ -63,15 +116,14 @@ const Navbar = () => {
   ];
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    setIsLoggedIn(!!token);
-    const history = JSON.parse(localStorage.getItem("recent_searches")) || [];
+    setIsLoggedIn(isAuthenticated());
+    setDisplayName(readDisplayName());
+    const history = JSON.parse(localStorage.getItem("recent_searches") || "[]");
     setRecentSearches(history);
   }, []);
 
   const saveToRecentSearches = (term) => {
-    let updated = [term, ...recentSearches.filter((item) => item !== term)];
-    updated = updated.slice(0, 5);
+    const updated = [term, ...recentSearches.filter((t) => t !== term)].slice(0, 5);
     setRecentSearches(updated);
     localStorage.setItem("recent_searches", JSON.stringify(updated));
   };
@@ -79,7 +131,8 @@ const Navbar = () => {
   const handleInputChange = (e) => {
     const value = e.target.value;
     setQuery(value);
-    if (value.trim().length > 2) {
+    const shouldSearch = value.trim().length >= 3 || !isAll(category);
+    if (shouldSearch) {
       dispatch(searchProducts(value, category));
       setShowDropdown(true);
     } else {
@@ -88,20 +141,41 @@ const Navbar = () => {
     }
   };
 
+  const handleCategoryChange = (e) => {
+    const newCat = e.target.value;
+    setCategory(newCat);
+    const shouldSearch = query.trim().length >= 3 || !isAll(newCat);
+    if (shouldSearch) {
+      dispatch(searchProducts(query, newCat));
+      setShowDropdown(true);
+    } else {
+      dispatch(clearSearchResults());
+    }
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
-    const hasCategory = category && category !== "All";
-    const hasQuery = query.trim() !== "";
+    const hasCategory = !isAll(category);
+    const hasQuery = query.trim().length > 0;
     if (!hasCategory && !hasQuery) return;
     dispatch(searchProducts(query, category));
-    navigate(`/search?query=${encodeURIComponent(query)}&cat=${encodeURIComponent(category)}`);
+    navigate(
+      `/search?query=${encodeURIComponent(query)}&cat=${encodeURIComponent(
+        category
+      )}`
+    );
     setShowDropdown(false);
   };
 
   const handleSelect = (term) => {
     setQuery(term);
     saveToRecentSearches(term);
-    navigate(`/search?query=${encodeURIComponent(term)}&cat=${category}`);
+    dispatch(searchProducts(term, category));
+    navigate(
+      `/search?query=${encodeURIComponent(term)}&cat=${encodeURIComponent(
+        category
+      )}`
+    );
     setShowDropdown(false);
   };
 
@@ -110,11 +184,15 @@ const Navbar = () => {
     localStorage.removeItem("recent_searches");
   };
 
-  const onLogoutHandler = () => {
-    localStorage.clear();
+  // ✅ Fixed logout to use correct tokens
+  const handleSignOut = () => {
+    logout(); // clears token, role, token_exp
     setIsLoggedIn(false);
+    setDisplayName(null);
     navigate("/login");
   };
+
+  const handleSignIn = () => navigate("/login");
 
   return (
     <>
@@ -132,7 +210,7 @@ const Navbar = () => {
           <select
             className="amazon-select"
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={handleCategoryChange}
           >
             {categories.map((cat, idx) => (
               <option key={idx} value={cat}>
@@ -189,31 +267,46 @@ const Navbar = () => {
                 (loading ? (
                   <div className="dropdown-loading">Loading...</div>
                 ) : results.length > 0 ? (
-                  results.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => {
-                        navigate(`/products/${item.id}`);
-                        setShowDropdown(false);
-                      }}
-                      className="dropdown-result"
-                    >
-                      <img
-                        src={item.images?.[0] || "https://via.placeholder.com/40"}
-                        alt={item.title}
-                        width="40"
-                        height="40"
-                        className="rounded me-3"
-                        style={{ objectFit: "cover" }}
-                      />
-                      <div>
-                        <div className="fw-semibold text-truncate">{item.title}</div>
-                        <small className="text-muted">
-                          {item.category?.name || "Category"}
-                        </small>
+                  results.map((item) => {
+                    const pid = item.id ?? item.productId;
+                    const title = item.title ?? item.productName ?? "Unnamed";
+                    const thumb =
+                      (Array.isArray(item.images) && item.images[0]) ||
+                      (Array.isArray(item.imageUrls) && item.imageUrls[0]) ||
+                      "https://via.placeholder.com/40";
+                    const catName =
+                      item.category?.name ?? item.categoryName ?? "Category";
+
+                    return (
+                      <div
+                        key={pid}
+                        onClick={() => {
+                          navigate(`/products/${pid}`);
+                          setShowDropdown(false);
+                        }}
+                        className="dropdown-result"
+                      >
+                        <img
+                          src={thumb}
+                          alt={title}
+                          width="40"
+                          height="40"
+                          className="rounded me-3"
+                          style={{ objectFit: "cover" }}
+                          onError={(e) =>
+                            (e.currentTarget.src =
+                              "https://via.placeholder.com/40")
+                          }
+                        />
+                        <div>
+                          <div className="fw-semibold text-truncate">
+                            {title}
+                          </div>
+                          <small className="text-muted">{catName}</small>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="dropdown-empty">No results found</div>
                 ))}
@@ -223,24 +316,49 @@ const Navbar = () => {
 
         {/* Right Section */}
         <div className="amazon-right d-flex align-items-center">
+          {/* ✅ Admin visible only if role is admin */}
+          {isAuthenticated() && hasRole("ROLE_ADMIN") && (
+            <Link to="/admin/products" className="text-white me-4 fw-semibold">
+              Admin
+            </Link>
+          )}
+
           {/* Account Hover Menu */}
           <div
             className="amazon-account text-white me-4 position-relative"
             onMouseEnter={() => setShowAccountMenu(true)}
             onMouseLeave={() => setShowAccountMenu(false)}
           >
-            <span className="small text-muted">Hello, Teketsel</span>
-            <div className="fw-semibold">Account & Lists</div>
+            <span className="small text-muted">
+              Hello{displayName ? "," : ", "}
+            </span>
+            <div className="fw-semibold">
+              {displayName ? displayName : "Sign in"}
+            </div>
+            <div className="small">Account &amp; Lists ▾</div>
 
             {showAccountMenu && (
               <div className="account-hover-menu">
                 <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
                   <span className="fw-semibold text-dark">
-                    Who's shopping? Select a profile.
+                    {displayName ? `Hi, ${displayName}` : "Welcome"}
                   </span>
                   <div>
-                    <Link to="/login" className="text-primary small me-3">Switch Accounts</Link>
-                    <button onClick={onLogoutHandler} className="btn btn-link small text-primary p-0">Sign Out</button>
+                    {isLoggedIn ? (
+                      <button
+                        onClick={handleSignOut}
+                        className="btn btn-link small text-primary p-0"
+                      >
+                        Sign out
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleSignIn}
+                        className="btn btn-link small text-primary p-0"
+                      >
+                        Sign in
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -249,9 +367,21 @@ const Navbar = () => {
                   <div className="p-3 border-end" style={{ width: "40%" }}>
                     <h6 className="fw-bold">Your Lists</h6>
                     <ul className="list-unstyled small">
-                      <li><Link to="/lists" className="text-dark text-decoration-none">Create a List</Link></li>
-                      <li><Link to="/registry" className="text-dark text-decoration-none">Find a List or Registry</Link></li>
-                      <li><Link to="/saved" className="text-dark text-decoration-none">Your Saved Books</Link></li>
+                      <li>
+                        <Link to="/lists" className="text-dark text-decoration-none">
+                          Create a List
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/registry" className="text-dark text-decoration-none">
+                          Find a List or Registry
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/saved" className="text-dark text-decoration-none">
+                          Your Saved Books
+                        </Link>
+                      </li>
                     </ul>
                   </div>
 
@@ -259,13 +389,37 @@ const Navbar = () => {
                   <div className="p-3" style={{ flex: 1 }}>
                     <h6 className="fw-bold">Your Account</h6>
                     <ul className="list-unstyled small">
-                      <li><Link to="/orders" className="text-dark text-decoration-none">Orders</Link></li>
-                      <li><Link to="/recommendations" className="text-dark text-decoration-none">Recommendations</Link></li>
-                      <li><Link to="/history" className="text-dark text-decoration-none">Browsing History</Link></li>
-                      <li><Link to="/preferences" className="text-dark text-decoration-none">Shopping Preferences</Link></li>
-                      <li><Link to="/subscriptions" className="text-dark text-decoration-none">Memberships & Subscriptions</Link></li>
-                      <li><Link to="/prime" className="text-dark text-decoration-none">Prime Membership</Link></li>
-                      <li><Link to="/sell" className="text-dark text-decoration-none">Start a Selling Account</Link></li>
+                      <li>
+                        <Link to="/orders" className="text-dark text-decoration-none">
+                          Orders
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/history" className="text-dark text-decoration-none">
+                          Browsing History
+                        </Link>
+                      </li>
+                      <li>
+                        <Link
+                          to="/preferences"
+                          className="text-dark text-decoration-none"
+                        >
+                          Shopping Preferences
+                        </Link>
+                      </li>
+                      <li>
+                        <Link
+                          to="/subscriptions"
+                          className="text-dark text-decoration-none"
+                        >
+                          Memberships &amp; Subscriptions
+                        </Link>
+                      </li>
+                      <li>
+                        <Link to="/sell" className="text-dark text-decoration-none">
+                          Start a Selling Account
+                        </Link>
+                      </li>
                     </ul>
                   </div>
                 </div>
@@ -276,19 +430,11 @@ const Navbar = () => {
           {/* Cart */}
           <Link to="/cart" className="cart-btn position-relative text-white me-3">
             <i className="bi bi-cart3 fs-5"></i>
-            {cartItemCount > 0 && <span className="cart-badge">{cartItemCount}</span>}
+            {cartItemCount > 0 && (
+              <span className="cart-badge">{cartItemCount}</span>
+            )}
             <span className="ms-1 fw-semibold">Cart</span>
           </Link>
-
-          {isLoggedIn ? (
-            <button onClick={onLogoutHandler} className="btn btn-danger btn-sm">
-              Logout
-            </button>
-          ) : (
-            <Link to="/login" className="btn btn-warning btn-sm">
-              Login
-            </Link>
-          )}
         </div>
       </nav>
 

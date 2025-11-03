@@ -1,76 +1,77 @@
 import React from "react";
 import { useDispatch } from "react-redux";
-import {
-  addToCart,
-  decreaseQuantity,
-  deleteFromCart,
-} from "../../../redux/actions/cart-actions";
+import { addToCart, decreaseQuantity, deleteFromCart } from "../../../redux/actions/cart-actions";
 import { showToast } from "../../../utils/ToastService";
 
 const CartItemCard = ({ item, selectedItems, setSelectedItems }) => {
   const dispatch = useDispatch();
-  const isSelected = selectedItems.includes(item.id);
 
-  // ✅ Select / Deselect checkbox
+  const rowKey = item.lineId ?? item.productId ?? item.id;
+
+  const isSelected = selectedItems?.includes(rowKey);
+
   const toggleSelect = () => {
-    if (isSelected) {
-      setSelectedItems(selectedItems.filter((id) => id !== item.id));
-    } else {
-      setSelectedItems([...selectedItems, item.id]);
-    }
+    setSelectedItems(
+      isSelected ? selectedItems.filter((k) => k !== rowKey) : [...selectedItems, rowKey]
+    );
   };
 
-  // ➕ Increase quantity
   const handleIncrease = () => {
     dispatch(addToCart(item));
     showToast(`Increased "${item.title}" quantity`, "info");
   };
 
-  // ➖ Decrease quantity
   const handleDecrease = () => {
-    dispatch(decreaseQuantity(item.id));
-    showToast(`Decreased "${item.title}" quantity`, "warning");
+    const q = Number(item.quantity ?? 1);
+    if (q <= 1) {
+      dispatch(deleteFromCart(rowKey)); // your reducer should accept an id
+      setSelectedItems(selectedItems.filter((k) => k !== rowKey));
+      showToast(`Removed "${item.title}" from cart`, "danger");
+    } else {
+      dispatch(decreaseQuantity(rowKey));
+      showToast(`Decreased "${item.title}" quantity`, "warning");
+    }
   };
 
-  // 🗑 Delete item
   const handleDelete = () => {
-    dispatch(deleteFromCart(item));
+    dispatch(deleteFromCart(rowKey));
+    setSelectedItems(selectedItems.filter((k) => k !== rowKey));
     showToast(`Removed "${item.title}" from cart`, "danger");
-    setSelectedItems(selectedItems.filter((id) => id !== item.id));
   };
 
-  // 💾 Save for later
   const handleSaveForLater = () => {
     dispatch({ type: "SAVE_FOR_LATER", payload: item });
+    setSelectedItems(selectedItems.filter((k) => k !== rowKey));
     showToast(`Saved "${item.title}" for later`, "success");
-    setSelectedItems(selectedItems.filter((id) => id !== item.id));
   };
+
+  const imgSrc = item.imageUrls?.[0] || item.images?.[0] || "/images/placeholder.png";
+  const price = Number(item.price);
+  const qty = Math.max(1, Number(item.quantity ?? 1));
 
   return (
     <div className="border-bottom py-4">
       <div className="d-flex align-items-start">
-        {/* ✅ Checkbox */}
         <div className="me-3 mt-2">
           <input
             type="checkbox"
-            checked={isSelected}
+            checked={!!isSelected}
             onChange={toggleSelect}
             className="form-check-input"
-            style={{ width: "18px", height: "18px" }}
+            style={{ width: 18, height: 18 }}
           />
         </div>
 
-        {/* 🖼 Product Image */}
         <img
-          src={item.images?.[0] || "https://via.placeholder.com/120"}
+          src={imgSrc}
           alt={item.title}
           width="120"
           height="120"
           className="border rounded me-3"
-          style={{ objectFit: "contain" }}
+          style={{ objectFit: "contain", background: "#fafafa" }}
+          onError={(e) => { e.currentTarget.src = "/images/placeholder.png"; }}
         />
 
-        {/* 📋 Product Info */}
         <div className="flex-grow-1">
           <h6 className="fw-semibold mb-1">{item.title}</h6>
           <p className="text-success small mb-1">In Stock</p>
@@ -89,58 +90,30 @@ const CartItemCard = ({ item, selectedItems, setSelectedItems }) => {
             <span className="text-dark">Black</span>
           </p>
 
-          {/* ➕➖ Quantity Controls */}
           <div className="d-flex align-items-center mt-3">
-            <div
-              className="d-flex align-items-center border rounded-pill px-2 py-1"
-              style={{
-                borderColor: "#FFD814",
-                backgroundColor: "#fff",
-                fontSize: "14px",
-              }}
-            >
-              <button
-                className="btn p-0 px-2"
-                onClick={handleDecrease}
-                disabled={item.quantity <= 1}
-              >
-                −
-              </button>
-              <span className="px-2 fw-semibold">{item.quantity}</span>
-              <button className="btn p-0 px-2" onClick={handleIncrease}>
-                +
-              </button>
+            <div className="d-flex align-items-center border rounded-pill px-2 py-1">
+              <button className="btn p-0 px-2" onClick={handleDecrease}>−</button>
+              <span className="px-2 fw-semibold">{qty}</span>
+              <button className="btn p-0 px-2" onClick={handleIncrease}>+</button>
             </div>
 
-            {/* 🧩 Action Links */}
             <div className="ms-3 small text-nowrap">
-              <button
-                className="btn btn-link p-0 text-decoration-none me-3"
-                onClick={handleDelete}
-              >
+              <button className="btn btn-link p-0 text-decoration-none me-3" onClick={handleDelete}>
                 Delete
               </button>
-              <button
-                className="btn btn-link p-0 text-decoration-none me-3"
-                onClick={handleSaveForLater}
-              >
+              <button className="btn btn-link p-0 text-decoration-none me-3" onClick={handleSaveForLater}>
                 Save for later
               </button>
-              <button className="btn btn-link p-0 text-decoration-none me-3">
-                Compare
-              </button>
-              <button className="btn btn-link p-0 text-decoration-none">
-                Share
-              </button>
+              <button className="btn btn-link p-0 text-decoration-none me-3">Compare</button>
+              <button className="btn btn-link p-0 text-decoration-none">Share</button>
             </div>
           </div>
         </div>
 
-        {/* 💰 Price Section */}
-        <div className="text-end ms-3" style={{ minWidth: "120px" }}>
-          <h6 className="fw-bold mb-0">${item.price.toFixed(2)}</h6>
+        <div className="text-end ms-3" style={{ minWidth: 120 }}>
+          <h6 className="fw-bold mb-0">${price.toFixed(2)}</h6>
           <small className="text-muted">
-            (${(item.price / item.quantity).toFixed(2)} / count)
+            (${(price / qty).toFixed(2)} / count)
           </small>
         </div>
       </div>

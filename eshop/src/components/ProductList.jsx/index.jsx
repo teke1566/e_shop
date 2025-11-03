@@ -13,11 +13,8 @@ const ProductList = () => {
     const params = new URLSearchParams(location.search);
     const categoryId = params.get("category");
 
-    // build API endpoint
     let endpoint = "/api/products";
-    if (categoryId) {
-      endpoint = `/api/products/by-category/${categoryId}`;
-    }
+    if (categoryId) endpoint = `/api/products/by-category/${categoryId}`;
 
     setLoading(true);
     setError(null);
@@ -25,15 +22,18 @@ const ProductList = () => {
     api
       .get(endpoint)
       .then((res) => {
-        console.log("✅ Products loaded from:", endpoint, res.data);
-        setProducts(res.data);
-        setLoading(false);
+        const data = res.data;
+        // normalize: array | {content:[]} | {products:[]}
+        const list = Array.isArray(data)
+          ? data
+          : data?.content ?? data?.products ?? [];
+        setProducts(list);
       })
       .catch((err) => {
         console.error("❌ Error fetching products:", err);
         setError("Failed to load products. Please try again.");
-        setLoading(false);
-      });
+      })
+      .finally(() => setLoading(false));
   }, [location.search]);
 
   return (
